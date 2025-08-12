@@ -59,11 +59,17 @@ texts = {
 def normalize_text(s):
     if pd.isna(s):
         return ""
-    s = str(s).strip().lower()
+    s = str(s).lower()
+    # Barcha turli apostroflarni yagona standartga o'zgartirish
     s = s.replace("’", "'").replace("‘", "'").replace("`", "'")
+    # “o‘” va “g‘” belgilarini standartlashtirish
     s = s.replace("o‘", "o'").replace("g‘", "g'")
-    s = " ".join(s.split())
+    # Boshqa keng tarqalgan belgilarni olib tashlash (masalan, nuqta, vergul, maxsus belgilar)
+    for ch in [".", ",", ";", ":", "-", "_", '"']:
+        s = s.replace(ch, "")
+    s = " ".join(s.split())  # ortiqcha probellarni olib tashlash
     return s
+
 
 def read_doc_or_docx(file):
     file_bytes = file.read()
