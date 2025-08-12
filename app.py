@@ -1,86 +1,82 @@
-
 import streamlit as st
 import pandas as pd
-import docx
-import io
+import re
+from io import BytesIO
+from thefuzz import process
 
-st.set_page_config(page_title="Data Compare", layout="wide")
+# --- Matnni normallashtirish funksiyasi ---
+def normalize_text(s):
+    if not isinstance(s, str):
+        return s
+    # Ortiqcha probellarni olib tashlash
+    s = re.sub(r"\s+", "", s)
+    # Katta-kichik harflarni birxillashtirish
+    s = s.lower()
+    # O‘ = O’, G‘ = G’ birxillashtirish
+    s = s.replace("o’", "o'").replace("o‘", "o'") \
+         .replace("g’", "g'").replace("g‘", "g'")
+    return s
 
-st.title("📊 Data Compare Platforma — 1-bosqich yangilanish")
+# --- Streamlit sarlavha ---
+st.title("📊 Ma'lumotlarni taqqoslash platformasi")
 
-st.markdown("**Yangi imkoniyatlar:** .doc, .docx, .txt, .xlsx, .csv fayllar; matnni vergul, qator yoki bo‘sh joy bilan ajratib kiritish.")
+# --- Ma'lumotlar bazasini yuklash ---
+uploaded_file = st.file_uploader("Ma'lumotlar bazasini yuklang (Excel yoki CSV)", type=["xlsx", "csv"])
 
-# Funksiya: turli fayllarni o'qish
-def read_file(uploaded_file):
-    file_type = uploaded_file.name.split('.')[-1].lower()
-
-    if file_type in ['xlsx', 'xls']:
+if uploaded_file:
+    if uploaded_file.name.endswith(".xlsx"):
         df = pd.read_excel(uploaded_file)
-    elif file_type == 'csv':
-        df = pd.read_csv(uploaded_file)
-    elif file_type in ['txt']:
-        text = uploaded_file.read().decode("utf-8")
-        df = pd.DataFrame(text.splitlines(), columns=["Data"])
-    elif file_type in ['doc', 'docx']:
-        doc = docx.Document(uploaded_file)
-        data = []
-        for table in doc.tables:
-            for row in table.rows:
-                data.append([cell.text for cell in row.cells])
-        if data:
-            df = pd.DataFrame(data)
-        else:
-            text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
-            df = pd.DataFrame(text.splitlines(), columns=["Data"])
     else:
-        st.error("❌ Noto'g'ri format!")
-        return None
-    return df
+        df = pd.read_csv(uploaded_file)
 
-# Ma'lumotlar bazasini yuklash
-st.header("1️⃣ Ma'lumotlar bazasini yuklash")
-db_file = st.file_uploader("Ma'lumotlar bazasini yuklang (.xlsx, .csv, .txt, .doc, .docx)", type=['xlsx','csv','txt','doc','docx'])
+    st.write("📄 Yuklangan ma'lumotlar bazasi:")
+    st.dataframe(df)
 
-if db_file:
-    db_df = read_file(db_file)
-    if db_df is not None:
-        st.dataframe(db_df.head())
+    # --- Taqqoslash ustunini tanlash ---
+    compare_column = st.selectbox("Taqqoslash uchun ustunni tanlang", df.columns)
 
-        # Taqqoslash ma'lumotlarini kiritish
-        st.header("2️⃣ Taqqoslash uchun ma'lumot kiriting yoki fayl yuklang")
-        input_type = st.radio("Ma'lumot kiritish usuli:", ["Qo'lda kiritish", "Fayl yuklash"])
+    # --- Tekshiriladigan ma'lumotlarni kiritish ---
+    input_data = st.text_area(
+        "Tekshiriladigan ma'lumotlarni kiriting (vergul bilan yoki qatorma-qator)",
+        placeholder="Misol: Lola, Anvar, Dilshod yoki\nLola\nAnvar\nDilshod"
+    )
 
-        compare_list = []
+    if st.button("🔍 Taqqoslash"):
+        if input_data.strip():
+            # --- Kirilgan ma'lumotlarni ajratish ---
+            check_values = re.split(r",|\n", input_data)
+            check_values = [normalize_text(v) for v in check_values if v.strip()]
 
-        if input_type == "Qo'lda kiritish":
-            user_input = st.text_area("Ma'lumotlarni kiriting (vergul, qator yoki bo‘sh joy bilan ajratilgan)")
-            if user_input.strip():
-                # Ajratish: vergul, yangi qator va bo'sh joy
-                for item in user_input.replace("\n", " ").replace(",", " ").split():
-                    compare_list.append(item.strip())
+            # --- Bazani normallashtirish ---
+            df[compare_column + "_norm"] = df[compare_column].apply(normalize_text)
+
+            # --- Aniqlik bo'yicha tekshirish ---
+            df["Mavjud"] = df[compare_column + "_norm"].isin(check_values)
+
+            # --- O'xshashlik bo'yicha tekshirish ---
+            norm_values_list = df[compare_column + "_norm"].dropna().unique().tolist()
+
+            closest_matches = []
+            match_scores = []
+            for val in check_values:
+                match, score = process.extractOne(val, norm_values_list)
+                closest_matches.append(match)
+                match_scores.append(score)
+
+            # --- Natija jadvali ---
+            result_df = pd.DataFrame({
+                "Kiritilgan ma'lumot": check_values,
+                "O'xshash topildi": closest_matches,
+                "O'xshashlik foizi": match_scores
+            })
+
+            st.write("📊 Taqqoslash natijasi:")
+            st.dataframe(result_df)
+
+            # --- CSV yuklab olish ---
+            output = BytesIO()
+            result_df.to_csv(output, index=False)
+            st.download_button("📥 Natijani yuklab olish (CSV)", data=output.getvalue(), file_name="natija.csv", mime="text/csv")
+
         else:
-            cmp_file = st.file_uploader("Tekshiriladigan ma'lumotlar faylini yuklang", type=['xlsx','csv','txt','doc','docx'])
-            if cmp_file:
-                cmp_df = read_file(cmp_file)
-                if cmp_df is not None:
-                    compare_list = cmp_df.iloc[:,0].dropna().astype(str).tolist()
-
-        if compare_list:
-            st.write("**Tekshiriladigan ma'lumotlar:**", compare_list)
-
-            # Ustunni tanlash
-            column_choice = st.selectbox("Taqqoslash uchun ustunni tanlang", db_df.columns)
-            if column_choice:
-                db_values = db_df[column_choice].dropna().astype(str).tolist()
-
-                results = {"Topildi": [], "Topilmadi": []}
-                for val in compare_list:
-                    if val in db_values:
-                        results["Topildi"].append(val)
-                    else:
-                        results["Topilmadi"].append(val)
-
-                st.subheader("✅ Natijalar")
-                st.write("**Topildi:**", results["Topildi"])
-                st.write("**Topilmadi:**", results["Topilmadi"])
-
+            st.warning("Iltimos, tekshiriladigan ma'lumotlarni kiriting.")
