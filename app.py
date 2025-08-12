@@ -3,6 +3,8 @@ import pandas as pd
 from io import BytesIO
 from thefuzz import fuzz
 from docx import Document
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # Matnni normallashtirish funksiyasi
 def normalize_text(s):
@@ -50,6 +52,35 @@ def load_file(file):
         st.error("Qo'llab-quvvatlanmaydigan format")
         return None
 
+# Natijani Word faylga aylantirish funksiyasi
+def df_to_word(df):
+    doc = Document()
+    doc.add_heading('Taqqoslash Natijalari', level=1)
+
+    table = doc.add_table(rows=1, cols=len(df.columns))
+    table.style = 'Table Grid'
+
+    # Sarlavhalar
+    hdr_cells = table.rows[0].cells
+    for i, col_name in enumerate(df.columns):
+        hdr_cells[i].text = str(col_name)
+        para = hdr_cells[i].paragraphs[0]
+        para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = para.runs[0]
+        run.font.bold = True
+        run.font.size = Pt(11)
+
+    # Ma'lumotlar
+    for _, row in df.iterrows():
+        row_cells = table.add_row().cells
+        for i, val in enumerate(row):
+            row_cells[i].text = str(val)
+
+    f = BytesIO()
+    doc.save(f)
+    f.seek(0)
+    return f
+
 # --- Streamlit interfeysi ---
 
 st.title("📊 Ma'lumotlarni Taqqoslash Platformasi (Demo)")
@@ -88,7 +119,6 @@ if uploaded_db is not None:
             extra_columns = st.multiselect("Natijada ko'rsatish uchun qo'shimcha ustunlar",
                                            [col for col in df.columns if col != column_to_check])
 
-            # O'xshashlik foizini tanlash uchun slider
             similarity_threshold = st.slider("O'xshashlik foizini tanlang (%)", min_value=50, max_value=100, value=80, step=1)
 
             if st.button("Taqqoslash"):
@@ -124,5 +154,16 @@ if uploaded_db is not None:
                 st.subheader("Natijalar")
                 st.dataframe(result_df)
 
+                # CSV yuklab olish
                 csv = result_df.to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Natijani yuklab olish (.csv)", csv, "natijalar.csv", "text/csv")
+
+                # Excel yuklab olish
+                towrite = BytesIO()
+                result_df.to_excel(towrite, index=False, engine='openpyxl')
+                towrite.seek(0)
+                st.download_button("📥 Natijani yuklab olish (.xlsx)", towrite, "natijalar.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+                # Word yuklab olish
+                word_file = df_to_word(result_df)
+                st.download_button("📥 Natijani yuklab olish (.docx)", word_file, "natijalar.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
