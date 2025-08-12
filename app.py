@@ -9,9 +9,9 @@ def normalize_text(s):
     if pd.isna(s):
         return ""
     s = str(s).strip().lower()
-    s = s.replace("’", "'").replace("‘", "'").replace("`", "'")  # turli tutuq belgilarni bir xil qilish
-    s = s.replace("o'", "o‘").replace("g'", "g‘")  # o' -> o‘, g' -> g‘
-    s = "".join(s.split())  # barcha probellarni olib tashlash
+    s = s.replace("’", "'").replace("‘", "'").replace("`", "'")
+    s = s.replace("o'", "o‘").replace("g'", "g‘")
+    s = "".join(s.split())
     return s
 
 st.title("📊 Ma'lumotlarni Taqqoslash Platformasi (Yangi versiya)")
@@ -33,9 +33,10 @@ if input_type == "Fayl yuklash":
         else:
             input_data = pd.read_csv(uploaded_check)
 elif input_type == "Qo'lda kiritish":
-    raw_text = st.text_area("Ma'lumotlarni kiriting (vergul, yangi qatordan yoki bo‘sh joy bilan ajratib)")
+    raw_text = st.text_area("Ma'lumotlarni kiriting (vergul yoki yangi qatordan ajratib)")
     if raw_text.strip():
-        items = [x.strip() for x in raw_text.replace("\n", ",").replace(" ", ",").split(",") if x.strip()]
+        # Faqat vergul va yangi qator bo‘yicha bo‘lish
+        items = [x.strip() for x in raw_text.replace("\n", ",").split(",") if x.strip()]
         input_data = pd.DataFrame(items, columns=["InputData"])
 
 # 3️⃣ Agar baza yuklangan bo‘lsa
@@ -68,9 +69,8 @@ if uploaded_db is not None:
                 exact_match = item in df["__norm_col__"].values
                 similar_items = []
                 for val in df["__norm_col__"].unique():
-                    score = fuzz.ratio(item, val)
-                    if score >= 80 and val != item:
-                        similar_items.append(f"{val} ({score}%)")
+                    if fuzz.ratio(item, val) >= 80 and val != item:
+                        similar_items.append(val)  # foizsiz
 
                 match_row = df[df["__norm_col__"] == item].iloc[0] if exact_match else None
                 extra_data = {col: match_row[col] if match_row is not None else "" for col in extra_columns}
@@ -105,12 +105,13 @@ if uploaded_db is not None:
 
             # 📥 Word yuklab olish
             doc = Document()
-            doc.add_table(rows=1, cols=len(result_df.columns)).style = 'Table Grid'
-            hdr_cells = doc.tables[0].rows[0].cells
+            table = doc.add_table(rows=1, cols=len(result_df.columns))
+            table.style = 'Table Grid'
+            hdr_cells = table.rows[0].cells
             for i, col_name in enumerate(result_df.columns):
                 hdr_cells[i].text = col_name
             for _, row in result_df.iterrows():
-                row_cells = doc.tables[0].add_row().cells
+                row_cells = table.add_row().cells
                 for i, value in enumerate(row):
                     row_cells[i].text = str(value)
             word_buffer = BytesIO()
