@@ -1,118 +1,118 @@
 import streamlit as st
 import pandas as pd
-from difflib import SequenceMatcher
 from io import BytesIO
+from thefuzz import fuzz
 from docx import Document
 
-# --- Funksiya: o'xshashlikni hisoblash ---
-def similarity(a, b):
-    return SequenceMatcher(None, a, b).ratio() * 100
+# Ma'lumotlarni tozalash funksiyasi
+def normalize_text(s):
+    if pd.isna(s):
+        return ""
+    s = str(s).strip().lower()
+    s = s.replace("’", "'").replace("‘", "'").replace("`", "'")  # turli tutuq belgilarni bir xil qilish
+    s = s.replace("o'", "o‘").replace("g'", "g‘")  # o' -> o‘, g' -> g‘
+    s = "".join(s.split())  # barcha probellarni olib tashlash
+    return s
 
-# --- DOCX yuklab olish ---
-def to_docx(df):
-    doc = Document()
-    doc.add_table(df.shape[0]+1, df.shape[1])
+st.title("📊 Ma'lumotlarni Taqqoslash Platformasi (Yangi versiya)")
 
-    # ustun nomlari
-    for j, col in enumerate(df.columns):
-        doc.tables[0].cell(0, j).text = str(col)
+# 1️⃣ Ma'lumotlar bazasini yuklash
+st.subheader("1️⃣ Ma'lumotlar bazasini yuklang (.xlsx yoki .csv)")
+uploaded_db = st.file_uploader("Bazani yuklash", type=["xlsx", "csv"])
 
-    # qatorlar
-    for i in range(df.shape[0]):
-        for j in range(df.shape[1]):
-            doc.tables[0].cell(i+1, j).text = str(df.iat[i, j])
-    buffer = BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer
+# 2️⃣ Tekshiriladigan ma'lumotlarni kiritish
+st.subheader("2️⃣ Tekshiriladigan ma'lumotlarni yuklang yoki kiriting")
+input_type = st.radio("Kiritish usuli", ["Fayl yuklash", "Qo'lda kiritish"])
 
-st.set_page_config(page_title="Data Compare", layout="wide")
+input_data = None
+if input_type == "Fayl yuklash":
+    uploaded_check = st.file_uploader("Tekshiriladigan ma'lumotlar", type=["xlsx", "csv"])
+    if uploaded_check is not None:
+        if uploaded_check.name.endswith(".xlsx"):
+            input_data = pd.read_excel(uploaded_check)
+        else:
+            input_data = pd.read_csv(uploaded_check)
+elif input_type == "Qo'lda kiritish":
+    raw_text = st.text_area("Ma'lumotlarni kiriting (vergul, yangi qatordan yoki bo‘sh joy bilan ajratib)")
+    if raw_text.strip():
+        items = [x.strip() for x in raw_text.replace("\n", ",").replace(" ", ",").split(",") if x.strip()]
+        input_data = pd.DataFrame(items, columns=["InputData"])
 
-st.title("📊 Data Compare Platforma (V2.0)")
-st.write("Ma'lumotlarni yuklang, ustunlarni tanlang va taqqoslang.")
+# 3️⃣ Agar baza yuklangan bo‘lsa
+if uploaded_db is not None:
+    if uploaded_db.name.endswith(".xlsx"):
+        df = pd.read_excel(uploaded_db)
+    else:
+        df = pd.read_csv(uploaded_db)
 
-# --- Bazani yuklash ---
-db_file = st.file_uploader("Ma'lumotlar bazasini yuklang (.csv, .xlsx, .docx)", type=["csv", "xlsx", "docx"])
-df_db = None
-if db_file:
-    if db_file.name.endswith(".csv"):
-        df_db = pd.read_csv(db_file)
-    elif db_file.name.endswith(".xlsx"):
-        df_db = pd.read_excel(db_file)
-    elif db_file.name.endswith(".docx"):
-        doc = Document(db_file)
-        data = [[cell.text for cell in row.cells] for table in doc.tables for row in table.rows]
-        df_db = pd.DataFrame(data[1:], columns=data[0])
+    st.write("**Yuklangan ma'lumotlar bazasi:**")
+    st.dataframe(df)
 
-# --- Tekshiriladigan ma'lumotlarni yuklash yoki kiritish ---
-check_input_method = st.radio("Tekshiriladigan ma'lumotlarni kiriting yoki yuklang:",
-                               ["Qo'lda kiritish", "Fayl yuklash"])
-df_check = None
-check_data = None
+    if input_data is not None:
+        st.write("**Tekshiriladigan ma'lumotlar:**")
+        st.dataframe(input_data)
 
-if check_input_method == "Qo'lda kiritish":
-    raw_text = st.text_area("Ma'lumotlarni kiriting (vergul, satr yoki bo'sh joy bilan ajratilgan)")
-    if raw_text:
-        parts = [x.strip() for x in raw_text.replace("\n", ",").replace(" ", ",").split(",") if x.strip()]
-        df_check = pd.DataFrame(parts, columns=["Check_Data"])
-else:
-    check_file = st.file_uploader("Tekshiriladigan ma'lumotlarni yuklang (.csv, .xlsx, .docx)", type=["csv", "xlsx", "docx"])
-    if check_file:
-        if check_file.name.endswith(".csv"):
-            df_check = pd.read_csv(check_file)
-        elif check_file.name.endswith(".xlsx"):
-            df_check = pd.read_excel(check_file)
-        elif check_file.name.endswith(".docx"):
-            doc = Document(check_file)
-            data = [[cell.text for cell in row.cells] for table in doc.tables for row in table.rows]
-            df_check = pd.DataFrame(data[1:], columns=data[0])
+        # Taqqoslash uchun ustun tanlash
+        column_to_check = st.selectbox("Taqqoslash uchun ustun tanlang", df.columns)
 
-# --- Taqqoslash ---
-if df_db is not None and df_check is not None:
-    compare_column = st.selectbox("Taqqoslash uchun ustunni tanlang", df_db.columns)
-    show_columns = st.multiselect("Natijada ko'rsatish uchun qo'shimcha ustunlar", df_db.columns)
+        # Qo'shimcha ustunlar tanlash
+        extra_columns = st.multiselect("Natijada ko'rsatish uchun qo'shimcha ustunlar", [col for col in df.columns if col != column_to_check])
 
-    min_similarity = st.slider("Minimal o'xshashlik foizi", 0, 100, 80)
+        if st.button("Taqqoslash"):
+            # Ma'lumotlarni normallashtirish
+            df["__norm_col__"] = df[column_to_check].apply(normalize_text)
+            input_data["__norm_input__"] = input_data[input_data.columns[0]].apply(normalize_text)
 
-    results = []
-    for item in df_check.iloc[:, 0].astype(str):
-        best_match = None
-        best_score = 0
-        extra_data = {}
-        for val in df_db[compare_column].astype(str):
-            score = similarity(item.lower(), val.lower())
-            if score > best_score:
-                best_score = score
-                best_match = val
-        if best_score >= min_similarity:
-            row_data = df_db[df_db[compare_column].astype(str) == best_match]
-            if not row_data.empty:
-                for col in show_columns:
-                    extra_data[col] = row_data.iloc[0][col]
-        results.append({
-            "Input": item,
-            "Best Match": best_match if best_score >= min_similarity else None,
-            "Similarity %": round(best_score, 2),
-            **extra_data
-        })
+            results = []
+            for item in input_data["__norm_input__"]:
+                exact_match = item in df["__norm_col__"].values
+                similar_items = []
+                for val in df["__norm_col__"].unique():
+                    score = fuzz.ratio(item, val)
+                    if score >= 80 and val != item:
+                        similar_items.append(f"{val} ({score}%)")
 
-    df_results = pd.DataFrame(results)
+                match_row = df[df["__norm_col__"] == item].iloc[0] if exact_match else None
+                extra_data = {col: match_row[col] if match_row is not None else "" for col in extra_columns}
 
-    # Filtr opsiyasi
-    filter_sim = st.checkbox("Faqat mos kelganlarini ko'rsatish")
-    if filter_sim:
-        df_results = df_results[df_results["Best Match"].notna()]
+                results.append({
+                    "Kiritilgan": item,
+                    "Mavjud": "Ha" if exact_match else "Yo'q",
+                    "O'xshashlar": ", ".join(similar_items) if similar_items else "-",
+                    **extra_data
+                })
 
-    st.dataframe(df_results)
+            result_df = pd.DataFrame(results)
 
-    # Yuklab olish
-    csv_data = df_results.to_csv(index=False).encode("utf-8")
-    xlsx_buffer = BytesIO()
-    with pd.ExcelWriter(xlsx_buffer, engine="xlsxwriter") as writer:
-        df_results.to_excel(writer, index=False)
-    xlsx_buffer.seek(0)
-    docx_buffer = to_docx(df_results)
+            # Filtrlash
+            filter_choice = st.selectbox("Filtr:", ["Barchasi", "Faqat mavjudlar", "Faqat mavjud bo'lmaganlar"])
+            if filter_choice == "Faqat mavjudlar":
+                result_df = result_df[result_df["Mavjud"] == "Ha"]
+            elif filter_choice == "Faqat mavjud bo'lmaganlar":
+                result_df = result_df[result_df["Mavjud"] == "Yo'q"]
 
-    st.download_button("📥 CSV yuklab olish", csv_data, "results.csv", "text/csv")
-    st.download_button("📥 XLSX yuklab olish", xlsx_buffer, "results.xlsx")
-    st.download_button("📥 DOCX yuklab olish", docx_buffer, "results.docx")
+            st.subheader("Natijalar")
+            st.dataframe(result_df)
+
+            # 📥 CSV yuklab olish
+            csv = result_df.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Yuklab olish (.csv)", csv, "natijalar.csv", "text/csv")
+
+            # 📥 Excel yuklab olish
+            excel_buffer = BytesIO()
+            result_df.to_excel(excel_buffer, index=False)
+            st.download_button("📥 Yuklab olish (.xlsx)", excel_buffer.getvalue(), "natijalar.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+            # 📥 Word yuklab olish
+            doc = Document()
+            doc.add_table(rows=1, cols=len(result_df.columns)).style = 'Table Grid'
+            hdr_cells = doc.tables[0].rows[0].cells
+            for i, col_name in enumerate(result_df.columns):
+                hdr_cells[i].text = col_name
+            for _, row in result_df.iterrows():
+                row_cells = doc.tables[0].add_row().cells
+                for i, value in enumerate(row):
+                    row_cells[i].text = str(value)
+            word_buffer = BytesIO()
+            doc.save(word_buffer)
+            st.download_button("📥 Yuklab olish (.docx)", word_buffer.getvalue(), "natijalar.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
