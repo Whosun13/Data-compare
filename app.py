@@ -9,7 +9,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 # Til uchun lug'atlar
 texts = {
     "uz": {
-        "title": "📊 Ma'lumotlarni Taqqoslash Platformasi (Demo)",
+        "title": "📊 Ma'lumotlarni Taqqoslash Platformasi",
         "upload_db": "1️⃣ Ma'lumotlar bazasini yuklang (.xlsx, .csv, .doc, .docx, .txt)",
         "upload_check": "2️⃣ Tekshiriladigan ma'lumotlarni yuklang yoki kiriting",
         "input_method": "Kiritish usuli",
@@ -32,7 +32,7 @@ texts = {
         "unsupported_format": "Qo'llab-quvvatlanmaydigan format"
     },
     "ru": {
-        "title": "📊 Платформа сравнения данных (Демо)",
+        "title": "📊 Платформа сравнения данных",
         "upload_db": "1️⃣ Загрузите базу данных (.xlsx, .csv, .doc, .docx, .txt)",
         "upload_check": "2️⃣ Загрузите или введите проверяемые данные",
         "input_method": "Способ ввода",
