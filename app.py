@@ -10,7 +10,7 @@ def normalize_text(s):
     if pd.isna(s):
         return ""
     s = str(s).strip().lower()
-    s = s.replace("’", "'").replace("‘", "'").replace("", "'")
+    s = s.replace("’", "'").replace("‘", "'").replace("`", "'")
     s = s.replace("o'", "o‘").replace("g'", "g‘")
     s = "".join(s.split())
     return s
