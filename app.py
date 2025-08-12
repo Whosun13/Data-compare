@@ -25,6 +25,8 @@ st.subheader("2️⃣ Tekshiriladigan ma'lumotlarni yuklang yoki kiriting")
 input_type = st.radio("Kiritish usuli", ["Fayl yuklash", "Qo'lda kiritish"])
 
 input_data = None
+input_column_to_check = None
+
 if input_type == "Fayl yuklash":
     uploaded_check = st.file_uploader("Tekshiriladigan ma'lumotlar", type=["xlsx", "csv"])
     if uploaded_check is not None:
@@ -32,12 +34,14 @@ if input_type == "Fayl yuklash":
             input_data = pd.read_excel(uploaded_check)
         else:
             input_data = pd.read_csv(uploaded_check)
+        # Fayldan ustun tanlash
+        input_column_to_check = st.selectbox("Tekshiriladigan fayldagi ustun tanlang", input_data.columns)
 elif input_type == "Qo'lda kiritish":
     raw_text = st.text_area("Ma'lumotlarni kiriting (vergul yoki yangi qatordan ajratib)")
     if raw_text.strip():
-        # Faqat vergul va yangi qator bo‘yicha bo‘lish
         items = [x.strip() for x in raw_text.replace("\n", ",").split(",") if x.strip()]
         input_data = pd.DataFrame(items, columns=["InputData"])
+        input_column_to_check = "InputData"
 
 # 3️⃣ Agar baza yuklangan bo‘lsa
 if uploaded_db is not None:
@@ -53,8 +57,8 @@ if uploaded_db is not None:
         st.write("**Tekshiriladigan ma'lumotlar:**")
         st.dataframe(input_data)
 
-        # Taqqoslash uchun ustun tanlash
-        column_to_check = st.selectbox("Taqqoslash uchun ustun tanlang", df.columns)
+        # Bazadagi ustun tanlash
+        column_to_check = st.selectbox("Bazadagi ustun tanlang", df.columns)
 
         # Qo'shimcha ustunlar tanlash
         extra_columns = st.multiselect("Natijada ko'rsatish uchun qo'shimcha ustunlar", [col for col in df.columns if col != column_to_check])
@@ -62,7 +66,7 @@ if uploaded_db is not None:
         if st.button("Taqqoslash"):
             # Ma'lumotlarni normallashtirish
             df["__norm_col__"] = df[column_to_check].apply(normalize_text)
-            input_data["__norm_input__"] = input_data[input_data.columns[0]].apply(normalize_text)
+            input_data["__norm_input__"] = input_data[input_column_to_check].apply(normalize_text)
 
             results = []
             for item in input_data["__norm_input__"]:
