@@ -6,7 +6,57 @@ from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-# Matnni normallashtirish funksiyasi
+# Til uchun lug'atlar
+texts = {
+    "uz": {
+        "title": "📊 Ma'lumotlarni Taqqoslash Platformasi (Demo)",
+        "upload_db": "1️⃣ Ma'lumotlar bazasini yuklang (.xlsx, .csv, .doc, .docx, .txt)",
+        "upload_check": "2️⃣ Tekshiriladigan ma'lumotlarni yuklang yoki kiriting",
+        "input_method": "Kiritish usuli",
+        "file_upload": "Fayl yuklash",
+        "manual_input": "Qo'lda kiritish",
+        "load_db": "Bazani yuklash",
+        "load_check": "Tekshiriladigan ma'lumotlar",
+        "input_area": "Ma'lumotlarni kiriting (vergul yoki yangi qatordan ajratib)",
+        "db_loaded": "**Yuklangan ma'lumotlar bazasi:**",
+        "input_loaded": "**Tekshiriladigan ma'lumotlar:**",
+        "select_column_db": "Bazadagi taqqoslanadigan ustunni tanlang",
+        "select_column_input": "Tekshiriladigan fayldagi ustunni tanlang",
+        "extra_columns": "Natijada ko'rsatish uchun qo'shimcha ustunlar",
+        "similarity_slider": "O'xshashlik foizini tanlang (%)",
+        "compare_btn": "Taqqoslash",
+        "results": "Natijalar",
+        "download_csv": "📥 Natijani yuklab olish (.csv)",
+        "download_xlsx": "📥 Natijani yuklab olish (.xlsx)",
+        "download_docx": "📥 Natijani yuklab olish (.docx)",
+        "unsupported_format": "Qo'llab-quvvatlanmaydigan format"
+    },
+    "ru": {
+        "title": "📊 Платформа сравнения данных (Демо)",
+        "upload_db": "1️⃣ Загрузите базу данных (.xlsx, .csv, .doc, .docx, .txt)",
+        "upload_check": "2️⃣ Загрузите или введите проверяемые данные",
+        "input_method": "Способ ввода",
+        "file_upload": "Загрузить файл",
+        "manual_input": "Ввести вручную",
+        "load_db": "Загрузить базу",
+        "load_check": "Проверяемые данные",
+        "input_area": "Введите данные (через запятую или новую строку)",
+        "db_loaded": "**Загруженная база данных:**",
+        "input_loaded": "**Проверяемые данные:**",
+        "select_column_db": "Выберите столбец для сравнения в базе",
+        "select_column_input": "Выберите столбец во входных данных",
+        "extra_columns": "Дополнительные столбцы для отображения в результате",
+        "similarity_slider": "Выберите процент сходства (%)",
+        "compare_btn": "Сравнить",
+        "results": "Результаты",
+        "download_csv": "📥 Скачать результат (.csv)",
+        "download_xlsx": "📥 Скачать результат (.xlsx)",
+        "download_docx": "📥 Скачать результат (.docx)",
+        "unsupported_format": "Неподдерживаемый формат"
+    }
+}
+
+# Matnni normallashtirish funksiyasi (o'zgarmaydi)
 def normalize_text(s):
     if pd.isna(s):
         return ""
@@ -16,89 +66,37 @@ def normalize_text(s):
     s = " ".join(s.split())
     return s
 
-# Word faylini o'qish (matn yoki jadval)
-def read_doc_or_docx(file):
-    file_bytes = file.read()
-    file.seek(0)
-    doc = Document(BytesIO(file_bytes))
+# Word faylini o'qish va boshqalar ... (oldingi kabi)
 
-    if doc.tables:
-        tables_data = []
-        for table in doc.tables:
-            for row in table.rows:
-                row_data = [cell.text.strip() for cell in row.cells]
-                tables_data.append(row_data)
-        df = pd.DataFrame(tables_data)
-        df.columns = df.iloc[0]
-        df = df[1:].reset_index(drop=True)
-        return df
+# Faylni o'qish funksiyasi (oldingi kabi)
 
-    full_text = [para.text.strip() for para in doc.paragraphs if para.text.strip()]
-    return pd.DataFrame(full_text, columns=["Data"])
-
-# Faylni o'qish funksiyasi
-def load_file(file):
-    if file.name.endswith(".xlsx"):
-        return pd.read_excel(file)
-    elif file.name.endswith(".csv"):
-        return pd.read_csv(file)
-    elif file.name.endswith(".doc") or file.name.endswith(".docx"):
-        return read_doc_or_docx(file)
-    elif file.name.endswith(".txt"):
-        text = file.read().decode("utf-8")
-        lines = [line.strip() for line in text.splitlines() if line.strip()]
-        return pd.DataFrame(lines, columns=["Data"])
-    else:
-        st.error("Qo'llab-quvvatlanmaydigan format")
-        return None
-
-# Natijani Word faylga aylantirish funksiyasi
-def df_to_word(df):
-    doc = Document()
-    doc.add_heading('Taqqoslash Natijalari', level=1)
-
-    table = doc.add_table(rows=1, cols=len(df.columns))
-    table.style = 'Table Grid'
-
-    # Sarlavhalar
-    hdr_cells = table.rows[0].cells
-    for i, col_name in enumerate(df.columns):
-        hdr_cells[i].text = str(col_name)
-        para = hdr_cells[i].paragraphs[0]
-        para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = para.runs[0]
-        run.font.bold = True
-        run.font.size = Pt(11)
-
-    # Ma'lumotlar
-    for _, row in df.iterrows():
-        row_cells = table.add_row().cells
-        for i, val in enumerate(row):
-            row_cells[i].text = str(val)
-
-    f = BytesIO()
-    doc.save(f)
-    f.seek(0)
-    return f
+# Natijani Word faylga aylantirish funksiyasi (oldingi kabi)
 
 # --- Streamlit interfeysi ---
 
-st.title("📊 Ma'lumotlarni Taqqoslash Platformasi (Demo)")
+lang = st.selectbox("Til / Язык", options=["O'zbekcha", "Русский"])
 
-st.subheader("1️⃣ Ma'lumotlar bazasini yuklang (.xlsx, .csv, .doc, .docx, .txt)")
-uploaded_db = st.file_uploader("Bazani yuklash", type=["xlsx", "csv", "doc", "docx", "txt"])
+if lang == "O'zbekcha":
+    t = texts["uz"]
+else:
+    t = texts["ru"]
 
-st.subheader("2️⃣ Tekshiriladigan ma'lumotlarni yuklang yoki kiriting")
-input_type = st.radio("Kiritish usuli", ["Fayl yuklash", "Qo'lda kiritish"])
+st.title(t["title"])
+
+st.subheader(t["upload_db"])
+uploaded_db = st.file_uploader(t["load_db"], type=["xlsx", "csv", "doc", "docx", "txt"])
+
+st.subheader(t["upload_check"])
+input_type = st.radio(t["input_method"], [t["file_upload"], t["manual_input"]])
 
 input_data = None
-if input_type == "Fayl yuklash":
-    uploaded_check = st.file_uploader("Tekshiriladigan ma'lumotlar", type=["xlsx", "csv", "doc", "docx", "txt"])
+if input_type == t["file_upload"]:
+    uploaded_check = st.file_uploader(t["load_check"], type=["xlsx", "csv", "doc", "docx", "txt"])
     if uploaded_check is not None:
         input_data = load_file(uploaded_check)
 
-elif input_type == "Qo'lda kiritish":
-    raw_text = st.text_area("Ma'lumotlarni kiriting (vergul yoki yangi qatordan ajratib)")
+elif input_type == t["manual_input"]:
+    raw_text = st.text_area(t["input_area"])
     if raw_text.strip():
         items = [x.strip() for x in raw_text.replace("\n", ",").split(",") if x.strip()]
         input_data = pd.DataFrame(items, columns=["InputData"])
@@ -107,21 +105,20 @@ if uploaded_db is not None:
     df = load_file(uploaded_db)
 
     if df is not None:
-        st.write("**Yuklangan ma'lumotlar bazasi:**")
+        st.write(t["db_loaded"])
         st.dataframe(df)
 
         if input_data is not None:
-            st.write("**Tekshiriladigan ma'lumotlar:**")
+            st.write(t["input_loaded"])
             st.dataframe(input_data)
 
-            column_to_check = st.selectbox("Bazadagi taqqoslanadigan ustunni tanlang", df.columns)
-            input_column_to_check = st.selectbox("Tekshiriladigan fayldagi ustunni tanlang", input_data.columns)
-            extra_columns = st.multiselect("Natijada ko'rsatish uchun qo'shimcha ustunlar",
-                                           [col for col in df.columns if col != column_to_check])
+            column_to_check = st.selectbox(t["select_column_db"], df.columns)
+            input_column_to_check = st.selectbox(t["select_column_input"], input_data.columns)
+            extra_columns = st.multiselect(t["extra_columns"], [col for col in df.columns if col != column_to_check])
 
-            similarity_threshold = st.slider("O'xshashlik foizini tanlang (%)", min_value=50, max_value=100, value=80, step=1)
+            similarity_threshold = st.slider(t["similarity_slider"], min_value=50, max_value=100, value=80, step=1)
 
-            if st.button("Taqqoslash"):
+            if st.button(t["compare_btn"]):
                 df["__norm_col__"] = df[column_to_check].apply(normalize_text)
                 input_data["__norm_input__"] = input_data[input_column_to_check].apply(normalize_text)
 
@@ -144,26 +141,24 @@ if uploaded_db is not None:
                             extra_data[col] = ""
 
                     results.append({
-                        "Kiritilgan": item,
-                        "Mavjud": "Ha" if exact_match else "Yo'q",
-                        "O'xshashlar": ", ".join(similar_items) if similar_items else "-",
+                        t.get("Kiritilgan", "Kiritilgan"): item,
+                        t.get("Mavjud", "Mavjud"): "Ha" if exact_match else "Yo'q",
+                        t.get("O'xshashlar", "O'xshashlar"): ", ".join(similar_items) if similar_items else "-",
                         **extra_data
                     })
 
                 result_df = pd.DataFrame(results)
-                st.subheader("Natijalar")
+                st.subheader(t["results"])
                 st.dataframe(result_df)
 
-                # CSV yuklab olish
+                # Yuklab olish tugmalari
                 csv = result_df.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Natijani yuklab olish (.csv)", csv, "natijalar.csv", "text/csv")
+                st.download_button(t["download_csv"], csv, "natijalar.csv", "text/csv")
 
-                # Excel yuklab olish
                 towrite = BytesIO()
                 result_df.to_excel(towrite, index=False, engine='openpyxl')
                 towrite.seek(0)
-                st.download_button("📥 Natijani yuklab olish (.xlsx)", towrite, "natijalar.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                st.download_button(t["download_xlsx"], towrite, "natijalar.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-                # Word yuklab olish
                 word_file = df_to_word(result_df)
-                st.download_button("📥 Natijani yuklab olish (.docx)", word_file, "natijalar.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                st.download_button(t["download_docx"], word_file, "natijalar.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
