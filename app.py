@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from io import StringIO
 from thefuzz import fuzz
 
 # --- Til sozlamalari ---
@@ -80,51 +79,74 @@ def normalize_text(s):
     s = " ".join(s.split())
     return s
 
-# --- Stil va CSS ---
-def set_mode_css(mode):
-    if mode == "Tungi" or mode == "Night":
+# --- Kunduz / Tungi rejim CSS ---
+def set_mode_css(mode, lang):
+    night_vals = {
+        "uz": "Tungi",
+        "ru": "Тёмная",
+        "en": "Dark"
+    }
+    if mode == night_vals[lang]:
         st.markdown("""
             <style>
-            .reportview-container {
-                background-color: #121212;
-                color: white;
-            }
-            .css-1d391kg, .css-1d391kg * {
+            body, .css-18e3th9, .css-1d391kg, .st-bb {
+                background-color: #121212 !important;
                 color: white !important;
+            }
+            .css-18e3th9 * , .css-1d391kg * {
+                color: white !important;
+            }
+            .css-1d391kg, .st-bb {
+                background-color: #121212 !important;
             }
             </style>
         """, unsafe_allow_html=True)
     else:
         st.markdown("""
             <style>
-            .reportview-container {
-                background-color: white;
-                color: black;
-            }
-            .css-1d391kg, .css-1d391kg * {
+            body, .css-18e3th9, .css-1d391kg, .st-bb {
+                background-color: white !important;
                 color: black !important;
+            }
+            .css-18e3th9 * , .css-1d391kg * {
+                color: black !important;
+            }
+            .css-1d391kg, .st-bb {
+                background-color: white !important;
             }
             </style>
         """, unsafe_allow_html=True)
 
-# --- Tavsiya uchun tooltip uchun oddiy yordamchi ---
-def tooltip_html(text):
-    return f"""
-    <span style="border-bottom: 1px dotted black; cursor: help;" title="{text}">?</span>
-    """
-
 # --- Dastur boshlanishi ---
-lang = st.selectbox("🌐 "+ "Choose language / Tilni tanlang / Выберите язык", ["uz", "ru", "en"])
+
+# Session state uchun tilni boshqarish
+if "lang" not in st.session_state:
+    st.session_state.lang = "uz"
+
+lang = st.selectbox("🌐 " + "Choose language / Tilni tanlang / Выберите язык",
+                    options=["uz", "ru", "en"],
+                    index=["uz", "ru", "en"].index(st.session_state.lang))
+
+if lang != st.session_state.lang:
+    st.session_state.lang = lang
+
 text = langs[lang]
 
+# Kunduz/tungi rejim tanlovi
 mode_options = {
     "uz": ["Kunduzgi", "Tungi"],
-    "ru": ["Дневной", "Ночной"],
-    "en": ["Day", "Night"]
+    "ru": ["Светлая", "Тёмная"],
+    "en": ["Light", "Dark"]
 }
 
-mode = st.radio(text["mode_label"], mode_options[lang])
-set_mode_css(mode)
+if "mode" not in st.session_state:
+    st.session_state.mode = mode_options[lang][0]  # Default kunduzgi
+
+mode = st.radio(text["mode_label"], mode_options[lang], index=mode_options[lang].index(st.session_state.mode))
+if mode != st.session_state.mode:
+    st.session_state.mode = mode
+
+set_mode_css(st.session_state.mode, lang)
 
 st.title(text["title"])
 
@@ -163,15 +185,18 @@ if uploaded_db is not None:
         st.write(f"**{text['upload_check']}**")
         st.dataframe(input_data)
 
-        col1_label = text["choose_column_db"] + tooltip_html(text["tooltip_db_col"])
-        col2_label = text["choose_column_input"] + tooltip_html(text["tooltip_input_col"])
-        extra_cols_label = text["extra_columns"] + tooltip_html(text["tooltip_extra_cols"])
+        # Ustun tanlashlar va caption tooltiplar
+        st.write(text["choose_column_db"])
+        col1 = st.selectbox("", df.columns)
+        st.caption(text["tooltip_db_col"])
 
-        # Selectboxlar uchun markdown hover (tooltip) ishlatish uchun label o‘rniga markdown qo‘yamiz
-        # Ammo selectboxda markdown ko‘rsatilmaydi, shuning uchun yonida kichik izoh beramiz
-        col1 = st.selectbox(text["choose_column_db"], df.columns)
-        col2 = st.selectbox(text["choose_column_input"], input_data.columns)
-        extra_cols = st.multiselect(text["extra_columns"], [col for col in df.columns if col != col1])
+        st.write(text["choose_column_input"])
+        col2 = st.selectbox("", input_data.columns)
+        st.caption(text["tooltip_input_col"])
+
+        st.write(text["extra_columns"])
+        extra_cols = st.multiselect("", [col for col in df.columns if col != col1])
+        st.caption(text["tooltip_extra_cols"])
 
         if st.button(text["compare_button"]):
             df["__norm_col__"] = df[col1].apply(normalize_text)
