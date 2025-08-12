@@ -88,6 +88,9 @@ if uploaded_db is not None:
             extra_columns = st.multiselect("Natijada ko'rsatish uchun qo'shimcha ustunlar",
                                            [col for col in df.columns if col != column_to_check])
 
+            # O'xshashlik foizini tanlash uchun slider
+            similarity_threshold = st.slider("O'xshashlik foizini tanlang (%)", min_value=50, max_value=100, value=80, step=1)
+
             if st.button("Taqqoslash"):
                 df["__norm_col__"] = df[column_to_check].apply(normalize_text)
                 input_data["__norm_input__"] = input_data[input_column_to_check].apply(normalize_text)
@@ -96,13 +99,11 @@ if uploaded_db is not None:
                 for item in input_data["__norm_input__"]:
                     exact_match = item in df["__norm_col__"].values
 
-                    # Aniq moslik bo'lsa mos qatorlarni olamiz
                     match_rows = df[df["__norm_col__"] == item] if exact_match else pd.DataFrame()
 
-                    # Fuzzy o'xshashliklar (80 ball va undan yuqori)
                     similar_items = []
                     for val in df["__norm_col__"].unique():
-                        if fuzz.ratio(item, val) >= 80 and val != item:
+                        if fuzz.ratio(item, val) >= similarity_threshold and val != item:
                             similar_items.append(val)
 
                     extra_data = {}
