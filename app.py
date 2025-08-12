@@ -1,17 +1,16 @@
 import streamlit as st
 import pandas as pd
-from io import BytesIO
+from io import StringIO, BytesIO
 from thefuzz import fuzz
 from docx import Document
 import mammoth
-import re
 
 # Ma'lumotlarni tozalash funksiyasi
 def normalize_text(s):
     if pd.isna(s):
         return ""
     s = str(s).strip().lower()
-    s = s.replace("’", "'").replace("‘", "'").replace("`", "'")
+    s = s.replace("’", "'").replace("‘", "'").replace("", "'")
     s = s.replace("o'", "o‘").replace("g'", "g‘")
     s = "".join(s.split())
     return s
@@ -19,15 +18,18 @@ def normalize_text(s):
 # Word faylini o'qish funksiyasi
 def read_doc_or_docx(file):
     file_bytes = file.read()
-    file.seek(0)
+    file.seek(0)  # o'qilgandan keyin qayta ishlash uchun kursorni qaytarish
 
+    # Agar fayl .doc bo'lsa, mammoth orqali .docx ga aylantiramiz
     if file.name.endswith(".doc"):
         with BytesIO(file_bytes) as doc_buffer:
             result = mammoth.convert_to_bytes(doc_buffer)
             file_bytes = result.value
 
+    # Endi faylni python-docx bilan ochamiz
     doc = Document(BytesIO(file_bytes))
 
+    # Agar faylda jadval bo'lsa
     if doc.tables:
         tables_data = []
         for table in doc.tables:
@@ -41,6 +43,7 @@ def read_doc_or_docx(file):
         df = df[1:]
         return df.reset_index(drop=True)
 
+    # Agar jadval bo'lmasa, oddiy matn sifatida
     full_text = [para.text.strip() for para in doc.paragraphs if para.text.strip()]
     return pd.DataFrame(full_text, columns=["Data"])
 
@@ -72,12 +75,7 @@ elif input_type == "Qo'lda kiritish":
         items = [x.strip() for x in raw_text.split(",") if x.strip()]
         input_data = pd.DataFrame(items, columns=["InputData"])
 
-# 🔍 Qidiruv turini tanlash
-search_type = st.radio(
-    "Qidiruv turini tanlang",
-    ["Aniq moslik", "Qisman moslik", "O‘xshashlik", "Regex"]
-)
-
+# 🔍 Taqqoslash jarayoni
 if uploaded_db is not None:
     if uploaded_db.name.endswith(".xlsx"):
         df = pd.read_excel(uploaded_db)
@@ -104,27 +102,7 @@ if uploaded_db is not None:
 
             results = []
             for item in input_data["__norm_input__"]:
-                if search_type == "Aniq moslik":
-                    exact_match_rows = df[df["__norm_col__"] == item]
-                elif search_type == "Qisman moslik":
-                    exact_match_rows = df[df["__norm_col__"].str.contains(item, na=False)]
-                elif search_type == "O‘xshashlik":
-                    matched_rows = []
-                    for _, row in df.iterrows():
-                        score = fuzz.ratio(row["__norm_col__"], item)
-                        if score > 70:
-                            matched_rows.append(row)
-                    exact_match_rows = pd.DataFrame(matched_rows)
-                elif search_type == "Regex":
-                    try:
-                        pattern = re.compile(item)
-                        exact_match_rows = df[df["__norm_col__"].apply(lambda x: bool(pattern.search(x)))]
-                    except re.error:
-                        st.error("Regex ifoda noto‘g‘ri kiritildi!")
-                        exact_match_rows = pd.DataFrame()
-                else:
-                    exact_match_rows = pd.DataFrame()
-
+                exact_match_rows = df[df["__norm_col__"] == item]
                 if not exact_match_rows.empty:
                     for _, row in exact_match_rows.iterrows():
                         res = {"Kiritilgan": row[col1], "Mavjud": "Ha"}
@@ -132,7 +110,7 @@ if uploaded_db is not None:
                             res[c] = row[c]
                         results.append(res)
                 else:
-                    results.append({"Kiritilgan": item, "Mavjud": "Yo‘q"})
+                    results.append({"Kiritilgan": item, "Mavjud": "Yo'q"})
 
             result_df = pd.DataFrame(results)
             st.subheader("Natijalar")
