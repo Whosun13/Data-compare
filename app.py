@@ -162,36 +162,39 @@ if uploaded_db is not None:
             similarity_threshold = st.slider(current_texts["similarity_slider"], min_value=50, max_value=100, value=80, step=1)
 
             if st.button(current_texts["compare_btn"]):
-                df["__norm_col__"] = df[column_to_check].apply(normalize_text)
-                input_data["__norm_input__"] = input_data[input_column_to_check].apply(normalize_text)
+    df["__norm_col__"] = df[column_to_check].apply(normalize_text)
+    input_data["__norm_input__"] = input_data[input_column_to_check].apply(normalize_text)
 
-                results = []
-                for item in input_data["__norm_input__"]:
-                    exact_match = item in df["__norm_col__"].values
-                    match_rows = df[df["__norm_col__"] == item] if exact_match else pd.DataFrame()
+    # Bo'sh qiymatlarni tashlab yuboramiz
+    filtered_input = input_data[input_data["__norm_input__"].astype(bool)]
 
-                    similar_items = []
-                    for val in df["__norm_col__"].unique():
-                        if fuzz.ratio(item, val) >= similarity_threshold and val != item:
-                            similar_items.append(val)
+    results = []
+    for item in filtered_input["__norm_input__"]:
+        match_rows = df[df["__norm_col__"] == item]
+        exact_match = not match_rows.empty
 
-                    extra_data = {}
-                    for col in extra_columns:
-                        if not match_rows.empty:
-                            extra_data[col] = ", ".join(match_rows[col].astype(str).unique())
-                        else:
-                            extra_data[col] = ""
+        similar_items = []
+        for val in df["__norm_col__"].unique():
+            if fuzz.ratio(item, val) >= similarity_threshold and val != item:
+                similar_items.append(val)
 
-                    results.append({
-                        current_texts.get("Kiritilgan", "Kiritilgan"): item,
-                        current_texts.get("Mavjud", "Mavjud"): "Ha" if exact_match else "Yo'q",
-                        current_texts.get("O'xshashlar", "O'xshashlar"): ", ".join(similar_items) if similar_items else "-",
-                        **extra_data
-                    })
+        extra_data = {}
+        for col in extra_columns:
+            if exact_match:
+                extra_data[col] = ", ".join(match_rows[col].astype(str).unique())
+            else:
+                extra_data[col] = ""
 
-                result_df = pd.DataFrame(results)
-                st.subheader(current_texts["results"])
-                st.dataframe(result_df)
+        results.append({
+            current_texts.get("Kiritilgan", "Kiritilgan"): item,
+            current_texts.get("Mavjud", "Mavjud"): "Ha" if exact_match else "Yo'q",
+            current_texts.get("O'xshashlar", "O'xshashlar"): ", ".join(similar_items) if similar_items else "-",
+            **extra_data
+        })
+
+    result_df = pd.DataFrame(results)
+    st.subheader(current_texts["results"])
+    st.dataframe(result_df)
 
                 csv = result_df.to_csv(index=False).encode('utf-8')
                 st.download_button(current_texts["download_csv"], csv, "natijalar.csv", "text/csv")
