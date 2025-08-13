@@ -196,7 +196,6 @@ if st.button(current_texts["compare_btn"]):
     st.dataframe(result_df)
 
     # Yuklab olish tugmalari
-    ...
 
     csv = result_df.to_csv(index=False).encode('utf-8')
     st.download_button(current_texts["download_csv"], csv, "natijalar.csv", "text/csv")
