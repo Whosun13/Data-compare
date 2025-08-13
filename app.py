@@ -196,13 +196,13 @@ if st.button(current_texts["compare_btn"]):
     st.subheader(current_texts["results"])
     st.dataframe(result_df)
 
-                csv = result_df.to_csv(index=False).encode('utf-8')
-                st.download_button(current_texts["download_csv"], csv, "natijalar.csv", "text/csv")
+    csv = result_df.to_csv(index=False).encode('utf-8')
+    st.download_button(current_texts["download_csv"], csv, "natijalar.csv", "text/csv")
 
-                towrite = BytesIO()
-                result_df.to_excel(towrite, index=False, engine='openpyxl')
-                towrite.seek(0)
-                st.download_button(current_texts["download_xlsx"], towrite, "natijalar.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    towrite = BytesIO()
+    result_df.to_excel(towrite, index=False, engine='openpyxl')
+    towrite.seek(0)
+    st.download_button(current_texts["download_xlsx"], towrite, "natijalar.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-                word_file = df_to_word(result_df)
-                st.download_button(current_texts["download_docx"], word_file, "natijalar.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    word_file = df_to_word(result_df)
+    st.download_button(current_texts["download_docx"], word_file, "natijalar.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
