@@ -161,7 +161,7 @@ if uploaded_db is not None:
 
             similarity_threshold = st.slider(current_texts["similarity_slider"], min_value=50, max_value=100, value=80, step=1)
 
-            if st.button(current_texts["compare_btn"]):
+if st.button(current_texts["compare_btn"]):
     df["__norm_col__"] = df[column_to_check].apply(normalize_text)
     input_data["__norm_input__"] = input_data[input_column_to_check].apply(normalize_text)
 
