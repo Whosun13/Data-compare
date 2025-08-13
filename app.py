@@ -165,11 +165,10 @@ if st.button(current_texts["compare_btn"]):
     df["__norm_col__"] = df[column_to_check].apply(normalize_text)
     input_data["__norm_input__"] = input_data[input_column_to_check].apply(normalize_text)
 
-    # Bo'sh qiymatlarni tashlab yuboramiz
     filtered_input = input_data[input_data["__norm_input__"].astype(bool)]
 
     results = []
-    for item in filtered_input["__norm_input__"]:
+    for original, item in zip(filtered_input[input_column_to_check], filtered_input["__norm_input__"]):
         match_rows = df[df["__norm_col__"] == item]
         exact_match = not match_rows.empty
 
@@ -186,7 +185,7 @@ if st.button(current_texts["compare_btn"]):
                 extra_data[col] = ""
 
         results.append({
-            current_texts.get("Kiritilgan", "Kiritilgan"): item,
+            current_texts.get("Kiritilgan", "Kiritilgan"): original,  # asl matn
             current_texts.get("Mavjud", "Mavjud"): "Ha" if exact_match else "Yo'q",
             current_texts.get("O'xshashlar", "O'xshashlar"): ", ".join(similar_items) if similar_items else "-",
             **extra_data
@@ -195,6 +194,9 @@ if st.button(current_texts["compare_btn"]):
     result_df = pd.DataFrame(results)
     st.subheader(current_texts["results"])
     st.dataframe(result_df)
+
+    # Yuklab olish tugmalari
+    ...
 
     csv = result_df.to_csv(index=False).encode('utf-8')
     st.download_button(current_texts["download_csv"], csv, "natijalar.csv", "text/csv")
